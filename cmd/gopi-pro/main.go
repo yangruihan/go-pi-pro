@@ -54,6 +54,7 @@ func main() {
 		agent.RunnerOptions{
 			MaxActRetries: *maxRetries,
 			AuditDir:      *auditDir,
+			WorkingDir:    cwd,
 			Approver: func(_ context.Context, step agent.PlanStep) (bool, error) {
 				if *autoApprove {
 					return true, nil

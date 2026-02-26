@@ -84,6 +84,9 @@ Schema:
 		r.todos.Upsert(step.Title, todo.StatusTodo)
 	}
 
+	requestedFiles := detectRequestedFiles(userInput)
+	writeIntent := hasWriteIntent(userInput)
+
 	actionLogs := make([]ActionStepLog, 0, len(plan.Steps))
 	for i, step := range plan.Steps {
 		if strings.TrimSpace(step.ID) == "" {
@@ -139,6 +142,21 @@ Schema:
 	}
 
 	actionText := renderActionLogs(actionLogs)
+	if writeIntent && len(requestedFiles) > 0 {
+		missing := findMissingFiles(requestedFiles, r.resolveWorkingDir())
+		if len(missing) > 0 {
+			msg := fmt.Sprintf("落盘校验失败，以下文件不存在: %s", strings.Join(missing, ", "))
+			r.todos.Upsert("落盘校验", todo.StatusBlocked)
+			actionLogs = append(actionLogs, ActionStepLog{
+				StepID:    "verify_files",
+				Title:     "校验文件落盘",
+				Status:    string(todo.StatusBlocked),
+				Attempts:  1,
+				ErrorText: msg,
+			})
+			actionText = renderActionLogs(actionLogs)
+		}
+	}
 	finalPrompt := fmt.Sprintf("基于以下执行记录，输出最终答复（先结论后细节，中文，简洁）。\n\n计划目标：%s\n\n%s", plan.Goal, actionText)
 	final, err := r.llm.Ask(ctx, finalPrompt)
 	if err != nil {
@@ -187,6 +205,73 @@ func parsePlan(raw string) Plan {
 		steps = append(steps, PlanStep{ID: fmt.Sprintf("s%d", i+1), Title: b, Reason: "fallback from bullets", Risk: "medium", RequiresApproval: false})
 	}
 	return Plan{Goal: "完成用户请求", Steps: steps}
+}
+
+func (r *Runner) resolveWorkingDir() string {
+	if strings.TrimSpace(r.opts.WorkingDir) != "" {
+		return r.opts.WorkingDir
+	}
+	cwd, _ := os.Getwd()
+	return cwd
+}
+
+func hasWriteIntent(s string) bool {
+	v := strings.ToLower(strings.TrimSpace(s))
+	if v == "" {
+		return false
+	}
+	keys := []string{"写", "创建", "保存", "生成文件", "write", "create", "save", "file"}
+	for _, k := range keys {
+		if strings.Contains(v, strings.ToLower(k)) {
+			return true
+		}
+	}
+	return false
+}
+
+func detectRequestedFiles(userInput string) []string {
+	text := strings.ReplaceAll(userInput, "\\", "/")
+	re := regexp.MustCompile(`([A-Za-z0-9._/-]+\.[A-Za-z0-9]{1,16})`)
+	matches := re.FindAllString(text, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(matches))
+	out := make([]string, 0, len(matches))
+	for _, m := range matches {
+		candidate := strings.TrimSpace(m)
+		candidate = strings.Trim(candidate, "`\"'.,;:()[]{}")
+		if candidate == "" {
+			continue
+		}
+		if strings.Contains(candidate, "://") {
+			continue
+		}
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		out = append(out, candidate)
+	}
+	return out
+}
+
+func findMissingFiles(files []string, workingDir string) []string {
+	missing := make([]string, 0)
+	for _, f := range files {
+		p := strings.TrimSpace(f)
+		if p == "" {
+			continue
+		}
+		full := p
+		if !filepath.IsAbs(full) {
+			full = filepath.Join(workingDir, full)
+		}
+		if _, err := os.Stat(full); err != nil {
+			missing = append(missing, p)
+		}
+	}
+	return missing
 }
 
 func normalizePlan(p Plan) (Plan, bool) {

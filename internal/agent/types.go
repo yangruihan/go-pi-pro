@@ -12,6 +12,7 @@ type RunnerOptions struct {
 	MaxActRetries int
 	Approver      Approver
 	AuditDir      string
+	WorkingDir    string
 }
 
 type PlanStep struct {

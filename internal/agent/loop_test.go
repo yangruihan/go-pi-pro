@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -68,5 +70,24 @@ func TestBuildReadPromptIncludesHistoryInstruction(t *testing.T) {
 	}
 	if !strings.Contains(p, "只有当历史里确实没有可用的更早用户消息") {
 		t.Fatalf("missing fallback constraint: %s", p)
+	}
+}
+
+func TestDetectRequestedFiles(t *testing.T) {
+	files := detectRequestedFiles("帮我写一个快速排序到 sort.py，并另存到 scripts/demo.py")
+	if len(files) != 2 {
+		t.Fatalf("unexpected files: %#v", files)
+	}
+}
+
+func TestFindMissingFiles(t *testing.T) {
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "a.txt")
+	if err := os.WriteFile(existing, []byte("ok"), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	missing := findMissingFiles([]string{"a.txt", "b.txt"}, dir)
+	if len(missing) != 1 || missing[0] != "b.txt" {
+		t.Fatalf("unexpected missing: %#v", missing)
 	}
 }
