@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yangruihan/go-pi-pro/internal/agent"
@@ -79,7 +80,9 @@ func main() {
 			continue
 		}
 
+		indicator := newThinkingIndicator()
 		res, err := runner.Run(context.Background(), text)
+		indicator.StopAndClear()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			continue
@@ -110,6 +113,48 @@ func main() {
 			fmt.Printf("\n[AUDIT]\n%s\n", res.AuditPath)
 		}
 	}
+}
+
+type thinkingIndicator struct {
+	stopCh  chan struct{}
+	doneCh  chan struct{}
+	stopped atomic.Bool
+}
+
+func newThinkingIndicator() *thinkingIndicator {
+	ti := &thinkingIndicator{
+		stopCh: make(chan struct{}),
+		doneCh: make(chan struct{}),
+	}
+	go func() {
+		defer close(ti.doneCh)
+		frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+		i := 0
+		ticker := time.NewTicker(120 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ti.stopCh:
+				return
+			case <-ticker.C:
+				fmt.Printf("\r[%s] 思考中...", frames[i%len(frames)])
+				i++
+			}
+		}
+	}()
+	return ti
+}
+
+func (ti *thinkingIndicator) StopAndClear() {
+	if ti == nil {
+		return
+	}
+	if !ti.stopped.CompareAndSwap(false, true) {
+		return
+	}
+	close(ti.stopCh)
+	<-ti.doneCh
+	fmt.Print("\r                \r")
 }
 
 type auditView struct {
