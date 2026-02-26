@@ -18,15 +18,15 @@ import (
 
 func main() {
 	var (
-		gopiBin     = flag.String("gopi-bin", "../gopi/build/gopi.exe", "path to gopi binary")
-		workdir     = flag.String("cwd", "", "working directory for task")
-		timeout     = flag.Int("timeout", 120, "timeout seconds for each LLM call")
-		autoApprove = flag.Bool("auto-approve", false, "auto approve high-risk steps")
-		maxRetries  = flag.Int("max-retries", 2, "max retries for each action step")
-		auditDir    = flag.String("audit-dir", ".gopi-pro/runs", "directory to persist run audit json")
-		showAudit   = flag.Bool("show-audit", false, "show latest audit summary and exit")
+		gopiBin       = flag.String("gopi-bin", "../gopi/build/gopi.exe", "path to gopi binary")
+		workdir       = flag.String("cwd", "", "working directory for task")
+		timeout       = flag.Int("timeout", 120, "timeout seconds for each LLM call")
+		autoApprove   = flag.Bool("auto-approve", false, "auto approve high-risk steps")
+		maxRetries    = flag.Int("max-retries", 2, "max retries for each action step")
+		auditDir      = flag.String("audit-dir", ".gopi-pro/runs", "directory to persist run audit json")
+		showAudit     = flag.Bool("show-audit", false, "show latest audit summary and exit")
 		showAuditFull = flag.Bool("show-audit-full", false, "show selected audit raw json and exit")
-		auditIndex  = flag.Int("show-audit-index", 1, "which latest audit to show, 1 means most recent")
+		auditIndex    = flag.Int("show-audit-index", 1, "which latest audit to show, 1 means most recent")
 	)
 	flag.Parse()
 
@@ -44,6 +44,7 @@ func main() {
 	}
 
 	client := gopi.New(*gopiBin, cwd)
+	defer client.Close()
 	runner := agent.NewRunner(
 		timeoutLLM{inner: client, timeout: time.Duration(*timeout) * time.Second},
 		agent.RunnerOptions{

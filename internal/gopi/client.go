@@ -6,18 +6,28 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+
+	gosdk "github.com/coderyrh/gopi/pkg/sdk"
 )
 
 type Client struct {
 	BinPath string
 	Cwd     string
+	sdk     *gosdk.Client
 }
 
 func New(binPath, cwd string) *Client {
-	return &Client{BinPath: strings.TrimSpace(binPath), Cwd: strings.TrimSpace(cwd)}
+	c := &Client{BinPath: strings.TrimSpace(binPath), Cwd: strings.TrimSpace(cwd)}
+	if sdkClient, err := gosdk.New(gosdk.Options{CWD: c.Cwd, ContinueLatest: true}); err == nil {
+		c.sdk = sdkClient
+	}
+	return c
 }
 
 func (c *Client) Ask(ctx context.Context, prompt string) (string, error) {
+	if c.sdk != nil {
+		return c.sdk.Ask(ctx, prompt)
+	}
 	if c.BinPath == "" {
 		return "", fmt.Errorf("gopi binary path is required")
 	}
@@ -38,4 +48,11 @@ func (c *Client) Ask(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("invoke gopi failed: %s", msg)
 	}
 	return strings.TrimSpace(out.String()), nil
+}
+
+func (c *Client) Close() error {
+	if c.sdk != nil {
+		return c.sdk.Close()
+	}
+	return nil
 }
