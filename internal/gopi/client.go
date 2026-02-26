@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	gosdk "github.com/coderyrh/gopi/pkg/sdk"
+	gosdk "github.com/yangruihan/go-pi/pkg/sdk"
 )
 
 type Client struct {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coderyrh/gopi-pro/internal/todo"
+	"github.com/yangruihan/go-pi-pro/internal/todo"
 )
 
 type Runner struct {

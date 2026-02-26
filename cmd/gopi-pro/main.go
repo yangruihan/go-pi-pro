@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coderyrh/gopi-pro/internal/agent"
-	"github.com/coderyrh/gopi-pro/internal/gopi"
+	"github.com/yangruihan/go-pi-pro/internal/agent"
+	"github.com/yangruihan/go-pi-pro/internal/gopi"
 )
 
 func main() {
