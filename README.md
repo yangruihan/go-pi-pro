@@ -37,6 +37,19 @@ go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit --show-audit-index
 go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit-full
 ```
 
+也可以使用构建脚本：
+
+```powershell
+cd ../gopi-pro
+.\make.ps1 build
+.\make.ps1 test
+```
+
+```bash
+make build
+make test
+```
+
 ## 参数
 
 - `--gopi-bin`：gopi 可执行文件路径
