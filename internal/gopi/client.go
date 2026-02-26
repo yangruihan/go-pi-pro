@@ -18,16 +18,16 @@ type Client struct {
 }
 
 type RuntimeInfo struct {
-	Mode        string
-	Provider    string
-	Model       string
-	ConfigModel string
+	Mode         string
+	Provider     string
+	Model        string
+	ConfigModel  string
 	SessionModel string
-	Host        string
-	APIBase     string
-	CWD         string
-	SessionID   string
-	ConfigPaths []string
+	Host         string
+	APIBase      string
+	CWD          string
+	SessionID    string
+	ConfigPaths  []string
 }
 
 func New(binPath, cwd string) *Client {
@@ -36,28 +36,28 @@ func New(binPath, cwd string) *Client {
 		c.sdk = sdkClient
 		si := sdkClient.Info()
 		c.info = RuntimeInfo{
-			Mode:        si.Mode,
-			Provider:    si.Provider,
-			Model:       si.Model,
-			ConfigModel: si.ConfigModel,
+			Mode:         si.Mode,
+			Provider:     si.Provider,
+			Model:        si.Model,
+			ConfigModel:  si.ConfigModel,
 			SessionModel: si.SessionModel,
-			Host:        si.Host,
-			APIBase:     si.APIBase,
-			CWD:         si.CWD,
-			SessionID:   si.SessionID,
-			ConfigPaths: append([]string(nil), si.ConfigPaths...),
+			Host:         si.Host,
+			APIBase:      si.APIBase,
+			CWD:          si.CWD,
+			SessionID:    si.SessionID,
+			ConfigPaths:  append([]string(nil), si.ConfigPaths...),
 		}
 	} else {
 		c.info = RuntimeInfo{
-			Mode:      "binary-fallback",
-			CWD:       c.Cwd,
-			Provider:  "(由 gopi 二进制决定)",
-			Model:     "(由 gopi 二进制决定)",
-			ConfigModel: "(由 gopi 二进制决定)",
+			Mode:         "binary-fallback",
+			CWD:          c.Cwd,
+			Provider:     "(由 gopi 二进制决定)",
+			Model:        "(由 gopi 二进制决定)",
+			ConfigModel:  "(由 gopi 二进制决定)",
 			SessionModel: "(由 gopi 二进制决定)",
-			Host:      "(由 gopi 二进制决定)",
-			APIBase:   "(由 gopi 二进制决定)",
-			SessionID: "(由 gopi 二进制决定)",
+			Host:         "(由 gopi 二进制决定)",
+			APIBase:      "(由 gopi 二进制决定)",
+			SessionID:    "(由 gopi 二进制决定)",
 		}
 	}
 	return c
