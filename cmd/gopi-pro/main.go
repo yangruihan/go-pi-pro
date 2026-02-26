@@ -329,9 +329,7 @@ type timeoutLLM struct {
 }
 
 func (t timeoutLLM) Ask(parentCtx context.Context, prompt string) (string, error) {
-	ctx, cancel := context.WithTimeout(parentCtx, t.timeout)
-	defer cancel()
-	out, err := t.inner.Ask(ctx, prompt)
+	out, err := t.askWithStreamingRetry(parentCtx, prompt, t.timeout)
 	if err == nil {
 		return out, nil
 	}
@@ -343,9 +341,33 @@ func (t timeoutLLM) Ask(parentCtx context.Context, prompt string) (string, error
 	if retryTimeout < 60*time.Second {
 		retryTimeout = 60 * time.Second
 	}
-	ctx2, cancel2 := context.WithTimeout(parentCtx, retryTimeout)
-	defer cancel2()
-	return t.inner.Ask(ctx2, prompt)
+	return t.askWithStreamingRetry(parentCtx, prompt, retryTimeout)
+}
+
+func (t timeoutLLM) askWithStreamingRetry(parentCtx context.Context, prompt string, timeout time.Duration) (string, error) {
+	if timeout <= 0 {
+		timeout = 120 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
+	defer cancel()
+
+	var lastErr error
+	for i := 0; i < 8; i++ {
+		out, err := t.inner.Ask(ctx, prompt)
+		if err == nil {
+			return out, nil
+		}
+		lastErr = err
+		if !isAlreadyStreamingErr(err) {
+			return "", err
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	return "", lastErr
 }
 
 func isTimeoutErr(err error) bool {
@@ -357,4 +379,12 @@ func isTimeoutErr(err error) bool {
 	}
 	msg := strings.ToLower(strings.TrimSpace(err.Error()))
 	return strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timeout")
+}
+
+func isAlreadyStreamingErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "agent is already streaming")
 }
