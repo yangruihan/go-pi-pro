@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/coderyrh/gopi-pro/internal/todo"
 )
@@ -20,10 +23,16 @@ func NewRunner(llm LLM, opts RunnerOptions) *Runner {
 	if opts.MaxActRetries <= 0 {
 		opts.MaxActRetries = 2
 	}
+	if strings.TrimSpace(opts.AuditDir) == "" {
+		opts.AuditDir = filepath.Join(".gopi-pro", "runs")
+	}
 	return &Runner{llm: llm, todos: todo.New(), opts: opts}
 }
 
 func (r *Runner) Run(ctx context.Context, userInput string) (StepResult, error) {
+	startedAt := time.Now()
+	r.todos = todo.New()
+
 	readPrompt := fmt.Sprintf("你是read阶段。提炼用户请求要点，不执行任何操作。\n用户请求：%s", userInput)
 	readSummary, err := r.llm.Ask(ctx, readPrompt)
 	if err != nil {
@@ -51,6 +60,26 @@ read摘要：%s`, readSummary)
 		return StepResult{}, err
 	}
 	plan := parsePlan(planRaw)
+	if fixed, ok := normalizePlan(plan); ok {
+		plan = fixed
+	} else {
+		repairPrompt := fmt.Sprintf(`你是plan修复阶段。将下面内容修复为严格JSON，不要输出其它文字。
+Schema:
+{"goal":"string","steps":[{"id":"s1","title":"string","reason":"string","risk":"low|medium|high","requires_approval":true}]}
+原始内容：
+%s`, planRaw)
+		repairedRaw, rerr := r.llm.Ask(ctx, repairPrompt)
+		if rerr == nil {
+			repaired := parsePlan(repairedRaw)
+			if fixed2, ok2 := normalizePlan(repaired); ok2 {
+				plan = fixed2
+			}
+		}
+	}
+	if _, ok := normalizePlan(plan); !ok {
+		return StepResult{}, fmt.Errorf("invalid plan: unable to normalize plan output")
+	}
+
 	for _, step := range plan.Steps {
 		r.todos.Upsert(step.Title, todo.StatusTodo)
 	}
@@ -116,11 +145,17 @@ read摘要：%s`, readSummary)
 		return StepResult{}, err
 	}
 
+	auditPath, auditErr := r.saveRunAudit(startedAt, userInput, strings.TrimSpace(readSummary), plan, actionLogs, strings.TrimSpace(final))
+	if auditErr != nil {
+		auditPath = ""
+	}
+
 	return StepResult{
 		ReadSummary: strings.TrimSpace(readSummary),
 		Plan:        plan,
 		ActionLogs:  actionLogs,
 		Final:       strings.TrimSpace(final),
+		AuditPath:   auditPath,
 	}, nil
 }
 
@@ -143,6 +178,53 @@ func parsePlan(raw string) Plan {
 		steps = append(steps, PlanStep{ID: fmt.Sprintf("s%d", i+1), Title: b, Reason: "fallback from bullets", Risk: "medium", RequiresApproval: false})
 	}
 	return Plan{Goal: "完成用户请求", Steps: steps}
+}
+
+func normalizePlan(p Plan) (Plan, bool) {
+	p.Goal = strings.TrimSpace(p.Goal)
+	if p.Goal == "" {
+		p.Goal = "完成用户请求"
+	}
+
+	if len(p.Steps) == 0 {
+		return Plan{}, false
+	}
+
+	seen := make(map[string]struct{}, len(p.Steps))
+	normalized := make([]PlanStep, 0, len(p.Steps))
+	for i, s := range p.Steps {
+		s.ID = strings.TrimSpace(s.ID)
+		s.Title = strings.TrimSpace(s.Title)
+		s.Reason = strings.TrimSpace(s.Reason)
+		s.Risk = strings.ToLower(strings.TrimSpace(s.Risk))
+
+		if s.Title == "" {
+			continue
+		}
+		if s.ID == "" {
+			s.ID = fmt.Sprintf("s%d", i+1)
+		}
+		if _, ok := seen[s.ID]; ok {
+			s.ID = fmt.Sprintf("%s_%d", s.ID, i+1)
+		}
+		seen[s.ID] = struct{}{}
+
+		switch s.Risk {
+		case "low", "medium", "high":
+		default:
+			s.Risk = "medium"
+		}
+		if s.Reason == "" {
+			s.Reason = "根据规划执行"
+		}
+		normalized = append(normalized, s)
+	}
+
+	if len(normalized) == 0 {
+		return Plan{}, false
+	}
+	p.Steps = normalized
+	return p, true
 }
 
 func stripCodeFence(s string) string {
@@ -183,6 +265,46 @@ func renderActionLogs(logs []ActionStepLog) string {
 		_, _ = fmt.Fprint(&b, "\n")
 	}
 	return strings.TrimSpace(b.String())
+}
+
+type runAudit struct {
+	StartedAt   string          `json:"started_at"`
+	UserInput   string          `json:"user_input"`
+	ReadSummary string          `json:"read_summary"`
+	Plan        Plan            `json:"plan"`
+	ActionLogs  []ActionStepLog `json:"action_logs"`
+	Final       string          `json:"final"`
+	Todos       string          `json:"todos"`
+}
+
+func (r *Runner) saveRunAudit(startedAt time.Time, userInput, readSummary string, plan Plan, logs []ActionStepLog, final string) (string, error) {
+	base := strings.TrimSpace(r.opts.AuditDir)
+	if base == "" {
+		base = filepath.Join(".gopi-pro", "runs")
+	}
+	if err := os.MkdirAll(base, 0o755); err != nil {
+		return "", err
+	}
+
+	fileName := fmt.Sprintf("run-%s.json", startedAt.Format("20060102-150405"))
+	path := filepath.Join(base, fileName)
+	payload := runAudit{
+		StartedAt:   startedAt.Format(time.RFC3339),
+		UserInput:   userInput,
+		ReadSummary: readSummary,
+		Plan:        plan,
+		ActionLogs:  logs,
+		Final:       final,
+		Todos:       r.TodosText(),
+	}
+	b, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, b, 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 func parseBullets(s string) []string {

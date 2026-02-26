@@ -30,3 +30,30 @@ func TestRenderActionLogs(t *testing.T) {
 		t.Fatalf("unexpected render result: %s", text)
 	}
 }
+
+func TestNormalizePlan(t *testing.T) {
+	p := Plan{
+		Goal: "",
+		Steps: []PlanStep{
+			{ID: "", Title: "  step a  ", Risk: "HIGH", Reason: ""},
+			{ID: "s1", Title: "step b", Risk: "unknown", Reason: "x"},
+			{ID: "s1", Title: "step c", Risk: "low", Reason: "y"},
+		},
+	}
+	n, ok := normalizePlan(p)
+	if !ok {
+		t.Fatalf("expected normalize success")
+	}
+	if n.Goal == "" {
+		t.Fatalf("goal should be filled")
+	}
+	if len(n.Steps) != 3 {
+		t.Fatalf("unexpected steps len: %d", len(n.Steps))
+	}
+	if n.Steps[0].ID == "" || n.Steps[1].ID == n.Steps[2].ID {
+		t.Fatalf("ids not normalized: %#v", n.Steps)
+	}
+	if n.Steps[0].Risk != "high" || n.Steps[1].Risk != "medium" {
+		t.Fatalf("risk normalize failed: %#v", n.Steps)
+	}
+}

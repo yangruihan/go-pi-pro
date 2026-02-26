@@ -11,6 +11,7 @@ type Approver func(ctx context.Context, step PlanStep) (bool, error)
 type RunnerOptions struct {
 	MaxActRetries int
 	Approver      Approver
+	AuditDir      string
 }
 
 type PlanStep struct {
@@ -40,4 +41,5 @@ type StepResult struct {
 	Plan        Plan
 	ActionLogs  []ActionStepLog
 	Final       string
+	AuditPath   string
 }

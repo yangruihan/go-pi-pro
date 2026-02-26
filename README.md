@@ -8,6 +8,8 @@
 - Plan 阶段：生成结构化 JSON 计划（步骤、风险、审批需求）
 - Act 阶段：逐步执行，每步更新 todo 状态，支持失败重试
 - Final 阶段：汇总输出
+- Plan 失败修复：当计划 JSON 不合规时，自动触发一次修复重试
+- 审计落盘：每次运行保存完整 JSON 审计日志
 - 通过调用 `gopi --print` 复用现有模型与工具能力
 
 ## 运行
@@ -33,6 +35,7 @@ go run ./cmd/gopi-pro --gopi-bin ../gopi/build/gopi.exe --cwd ../testdemo --auto
 - `--timeout`：每次 LLM 调用超时秒数（默认 120）
 - `--auto-approve`：自动批准高风险步骤
 - `--max-retries`：每个 act 步骤最大重试次数
+- `--audit-dir`：审计日志目录（默认 `.gopi-pro/runs`）
 
 ## 说明
 

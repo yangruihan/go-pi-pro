@@ -20,6 +20,7 @@ func main() {
 		timeout     = flag.Int("timeout", 120, "timeout seconds for each LLM call")
 		autoApprove = flag.Bool("auto-approve", false, "auto approve high-risk steps")
 		maxRetries  = flag.Int("max-retries", 2, "max retries for each action step")
+		auditDir    = flag.String("audit-dir", ".gopi-pro/runs", "directory to persist run audit json")
 	)
 	flag.Parse()
 
@@ -33,6 +34,7 @@ func main() {
 		timeoutLLM{inner: client, timeout: time.Duration(*timeout) * time.Second},
 		agent.RunnerOptions{
 			MaxActRetries: *maxRetries,
+			AuditDir:      *auditDir,
 			Approver: func(_ context.Context, step agent.PlanStep) (bool, error) {
 				if *autoApprove {
 					return true, nil
@@ -89,6 +91,9 @@ func main() {
 		}
 		fmt.Println("\n[FINAL]")
 		fmt.Println(res.Final)
+		if strings.TrimSpace(res.AuditPath) != "" {
+			fmt.Printf("\n[AUDIT]\n%s\n", res.AuditPath)
+		}
 	}
 }
 
