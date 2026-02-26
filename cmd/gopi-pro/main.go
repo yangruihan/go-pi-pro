@@ -3,9 +3,12 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,12 +24,21 @@ func main() {
 		autoApprove = flag.Bool("auto-approve", false, "auto approve high-risk steps")
 		maxRetries  = flag.Int("max-retries", 2, "max retries for each action step")
 		auditDir    = flag.String("audit-dir", ".gopi-pro/runs", "directory to persist run audit json")
+		showAudit   = flag.Bool("show-audit", false, "show latest audit summary and exit")
 	)
 	flag.Parse()
 
 	cwd := strings.TrimSpace(*workdir)
 	if cwd == "" {
 		cwd, _ = os.Getwd()
+	}
+
+	if *showAudit {
+		if err := printLatestAuditSummary(*auditDir); err != nil {
+			fmt.Fprintf(os.Stderr, "show audit failed: %v\n", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	client := gopi.New(*gopiBin, cwd)
@@ -95,6 +107,100 @@ func main() {
 			fmt.Printf("\n[AUDIT]\n%s\n", res.AuditPath)
 		}
 	}
+}
+
+type auditView struct {
+	StartedAt   string `json:"started_at"`
+	UserInput   string `json:"user_input"`
+	ReadSummary string `json:"read_summary"`
+	Plan        struct {
+		Goal  string `json:"goal"`
+		Steps []struct {
+			ID    string `json:"id"`
+			Title string `json:"title"`
+			Risk  string `json:"risk"`
+		} `json:"steps"`
+	} `json:"plan"`
+	ActionLogs []struct {
+		StepID   string `json:"step_id"`
+		Title    string `json:"title"`
+		Status   string `json:"status"`
+		Attempts int    `json:"attempts"`
+	} `json:"action_logs"`
+	Final string `json:"final"`
+}
+
+func printLatestAuditSummary(auditDir string) error {
+	base := strings.TrimSpace(auditDir)
+	if base == "" {
+		base = filepath.Join(".gopi-pro", "runs")
+	}
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Printf("[LATEST AUDIT]\n(no audit directory) %s\n", base)
+			return nil
+		}
+		return err
+	}
+
+	type f struct {
+		name    string
+		path    string
+		modTime time.Time
+	}
+	files := make([]f, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasPrefix(entry.Name(), "run-") || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		fullPath := filepath.Join(base, entry.Name())
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			continue
+		}
+		files = append(files, f{name: entry.Name(), path: fullPath, modTime: info.ModTime()})
+	}
+	if len(files) == 0 {
+		fmt.Printf("[LATEST AUDIT]\n(no audit files) %s\n", base)
+		return nil
+	}
+	sort.Slice(files, func(i, j int) bool {
+		if files[i].modTime.Equal(files[j].modTime) {
+			return files[i].name > files[j].name
+		}
+		return files[i].modTime.After(files[j].modTime)
+	})
+
+	b, err := os.ReadFile(files[0].path)
+	if err != nil {
+		return err
+	}
+	var audit auditView
+	if err := json.Unmarshal(b, &audit); err != nil {
+		return err
+	}
+
+	final := strings.TrimSpace(audit.Final)
+	if final == "" {
+		final = "(empty)"
+	}
+	if len(final) > 240 {
+		final = final[:240] + "..."
+	}
+
+	fmt.Println("[LATEST AUDIT]")
+	fmt.Println(files[0].path)
+	fmt.Printf("started_at: %s\n", strings.TrimSpace(audit.StartedAt))
+	fmt.Printf("goal: %s\n", strings.TrimSpace(audit.Plan.Goal))
+	fmt.Printf("steps: %d\n", len(audit.Plan.Steps))
+	fmt.Printf("action_logs: %d\n", len(audit.ActionLogs))
+	fmt.Printf("user_input: %s\n", strings.TrimSpace(audit.UserInput))
+	fmt.Printf("final: %s\n", final)
+	return nil
 }
 
 type timeoutLLM struct {

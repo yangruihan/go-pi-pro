@@ -26,6 +26,9 @@ cd ../gopi
 ```powershell
 cd ../gopi-pro
 go run ./cmd/gopi-pro --gopi-bin ../gopi/build/gopi.exe --cwd ../testdemo --auto-approve --max-retries 2
+
+# 查看最近一次审计摘要（不执行新任务）
+go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit
 ```
 
 ## 参数
@@ -36,6 +39,7 @@ go run ./cmd/gopi-pro --gopi-bin ../gopi/build/gopi.exe --cwd ../testdemo --auto
 - `--auto-approve`：自动批准高风险步骤
 - `--max-retries`：每个 act 步骤最大重试次数
 - `--audit-dir`：审计日志目录（默认 `.gopi-pro/runs`）
+- `--show-audit`：显示最新审计摘要并退出
 
 ## 说明
 
