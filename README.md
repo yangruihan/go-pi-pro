@@ -11,6 +11,7 @@
 - Plan 失败修复：当计划 JSON 不合规时，自动触发一次修复重试
 - 审计落盘：每次运行保存完整 JSON 审计日志
 - 优先通过 `go-pi` SDK 直接调用能力（初始化失败时回退到 `gopi --print`）
+- 启动时显示实际运行的 LLM 信息（provider/model/base/host/session）与配置来源路径
 
 ## 运行
 
@@ -67,6 +68,7 @@ make test
 
 - 若提示 `(no audit directory)` 或 `(no audit files)`，先执行一次正常任务生成审计文件。
 - 若出现 `context deadline exceeded`，可先用 `--no-spinner` 排除 UI 干扰，再适当调大 `--timeout` 观察是否为后端响应慢。
+- 启动输出中的 `config_paths` 即本次复用的 gopi 配置来源（home + project 覆盖链）。
 
 ## 说明
 

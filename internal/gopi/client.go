@@ -14,12 +14,45 @@ type Client struct {
 	BinPath string
 	Cwd     string
 	sdk     *gosdk.Client
+	info    RuntimeInfo
+}
+
+type RuntimeInfo struct {
+	Mode        string
+	Provider    string
+	Model       string
+	Host        string
+	APIBase     string
+	CWD         string
+	SessionID   string
+	ConfigPaths []string
 }
 
 func New(binPath, cwd string) *Client {
 	c := &Client{BinPath: strings.TrimSpace(binPath), Cwd: strings.TrimSpace(cwd)}
 	if sdkClient, err := gosdk.New(gosdk.Options{CWD: c.Cwd, ContinueLatest: true}); err == nil {
 		c.sdk = sdkClient
+		si := sdkClient.Info()
+		c.info = RuntimeInfo{
+			Mode:        si.Mode,
+			Provider:    si.Provider,
+			Model:       si.Model,
+			Host:        si.Host,
+			APIBase:     si.APIBase,
+			CWD:         si.CWD,
+			SessionID:   si.SessionID,
+			ConfigPaths: append([]string(nil), si.ConfigPaths...),
+		}
+	} else {
+		c.info = RuntimeInfo{
+			Mode:      "binary-fallback",
+			CWD:       c.Cwd,
+			Provider:  "(由 gopi 二进制决定)",
+			Model:     "(由 gopi 二进制决定)",
+			Host:      "(由 gopi 二进制决定)",
+			APIBase:   "(由 gopi 二进制决定)",
+			SessionID: "(由 gopi 二进制决定)",
+		}
 	}
 	return c
 }
@@ -55,4 +88,10 @@ func (c *Client) Close() error {
 		return c.sdk.Close()
 	}
 	return nil
+}
+
+func (c *Client) Info() RuntimeInfo {
+	out := c.info
+	out.ConfigPaths = append([]string(nil), c.info.ConfigPaths...)
+	return out
 }

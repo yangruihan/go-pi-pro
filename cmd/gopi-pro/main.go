@@ -48,6 +48,7 @@ func main() {
 
 	client := gopi.New(*gopiBin, cwd)
 	defer client.Close()
+	printRuntimeInfo(client.Info())
 	runner := agent.NewRunner(
 		timeoutLLM{inner: client, timeout: time.Duration(*timeout) * time.Second},
 		agent.RunnerOptions{
@@ -296,6 +297,22 @@ func listAuditFiles(base string) ([]auditFile, error) {
 		return files[i].modTime.After(files[j].modTime)
 	})
 	return files, nil
+}
+
+func printRuntimeInfo(info gopi.RuntimeInfo) {
+	fmt.Println("[RUNTIME]")
+	fmt.Printf("mode: %s\n", strings.TrimSpace(info.Mode))
+	fmt.Printf("provider: %s\n", strings.TrimSpace(info.Provider))
+	fmt.Printf("model: %s\n", strings.TrimSpace(info.Model))
+	fmt.Printf("host: %s\n", strings.TrimSpace(info.Host))
+	fmt.Printf("api_base: %s\n", strings.TrimSpace(info.APIBase))
+	fmt.Printf("session_id: %s\n", strings.TrimSpace(info.SessionID))
+	if len(info.ConfigPaths) > 0 {
+		fmt.Printf("config_paths: %s\n", strings.Join(info.ConfigPaths, " -> "))
+	} else {
+		fmt.Println("config_paths: (default built-in / managed by gopi binary)")
+	}
+	fmt.Printf("cwd: %s\n\n", strings.TrimSpace(info.CWD))
 }
 
 type timeoutLLM struct {
