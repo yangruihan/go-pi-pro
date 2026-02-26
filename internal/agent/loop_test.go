@@ -1,6 +1,9 @@
 package agent
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestParsePlanJSON(t *testing.T) {
 	raw := `{"goal":"完成任务","steps":[{"id":"s1","title":"读取文件","reason":"先了解上下文","risk":"low","requires_approval":false}]}`
@@ -55,5 +58,15 @@ func TestNormalizePlan(t *testing.T) {
 	}
 	if n.Steps[0].Risk != "high" || n.Steps[1].Risk != "medium" {
 		t.Fatalf("risk normalize failed: %#v", n.Steps)
+	}
+}
+
+func TestBuildReadPromptIncludesHistoryInstruction(t *testing.T) {
+	p := buildReadPrompt("我刚才问过你哪些问题")
+	if !strings.Contains(p, "你可以访问当前会话历史") {
+		t.Fatalf("missing history instruction: %s", p)
+	}
+	if !strings.Contains(p, "只有当历史里确实没有可用的更早用户消息") {
+		t.Fatalf("missing fallback constraint: %s", p)
 	}
 }

@@ -33,7 +33,7 @@ func (r *Runner) Run(ctx context.Context, userInput string) (StepResult, error) 
 	startedAt := time.Now()
 	r.todos = todo.New()
 
-	readPrompt := fmt.Sprintf("你是read阶段。提炼用户请求要点，不执行任何操作。\n用户请求：%s", userInput)
+	readPrompt := buildReadPrompt(userInput)
 	readSummary, err := r.llm.Ask(ctx, readPrompt)
 	if err != nil {
 		return StepResult{}, err
@@ -161,6 +161,15 @@ Schema:
 
 func (r *Runner) TodosText() string {
 	return r.todos.Render()
+}
+
+func buildReadPrompt(userInput string) string {
+	return fmt.Sprintf(`你是read阶段。提炼用户请求要点，不执行任何操作。
+你可以访问当前会话历史。
+如果用户在问“我刚才问过什么/之前问过什么/历史问题”，必须先基于会话历史中的用户消息进行归纳回答；
+只有当历史里确实没有可用的更早用户消息时，才可以说明无法回忆。
+输出要求：只输出提炼后的结论，不要输出工具调用或多余前后缀。
+用户请求：%s`, userInput)
 }
 
 func parsePlan(raw string) Plan {
