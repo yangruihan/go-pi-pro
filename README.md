@@ -29,6 +29,12 @@ go run ./cmd/gopi-pro --gopi-bin ../gopi/build/gopi.exe --cwd ../testdemo --auto
 
 # 查看最近一次审计摘要（不执行新任务）
 go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit
+
+# 查看第 2 新的审计摘要
+go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit --show-audit-index 2
+
+# 查看最新审计完整 JSON
+go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit-full
 ```
 
 ## 参数
@@ -40,6 +46,12 @@ go run ./cmd/gopi-pro --audit-dir .gopi-pro/runs --show-audit
 - `--max-retries`：每个 act 步骤最大重试次数
 - `--audit-dir`：审计日志目录（默认 `.gopi-pro/runs`）
 - `--show-audit`：显示最新审计摘要并退出
+- `--show-audit-full`：显示指定审计完整 JSON 并退出
+- `--show-audit-index`：指定查看第 N 新审计（默认 `1`）
+
+## 常见提示
+
+- 若提示 `(no audit directory)` 或 `(no audit files)`，先执行一次正常任务生成审计文件。
 
 ## 说明
 

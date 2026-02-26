@@ -269,6 +269,8 @@ func renderActionLogs(logs []ActionStepLog) string {
 
 type runAudit struct {
 	StartedAt   string          `json:"started_at"`
+	FinishedAt  string          `json:"finished_at"`
+	DurationMs  int64           `json:"duration_ms"`
 	UserInput   string          `json:"user_input"`
 	ReadSummary string          `json:"read_summary"`
 	Plan        Plan            `json:"plan"`
@@ -288,8 +290,11 @@ func (r *Runner) saveRunAudit(startedAt time.Time, userInput, readSummary string
 
 	fileName := fmt.Sprintf("run-%s.json", startedAt.Format("20060102-150405"))
 	path := filepath.Join(base, fileName)
+	finishedAt := time.Now()
 	payload := runAudit{
 		StartedAt:   startedAt.Format(time.RFC3339),
+		FinishedAt:  finishedAt.Format(time.RFC3339),
+		DurationMs:  finishedAt.Sub(startedAt).Milliseconds(),
 		UserInput:   userInput,
 		ReadSummary: readSummary,
 		Plan:        plan,
