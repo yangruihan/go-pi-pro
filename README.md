@@ -10,7 +10,7 @@
 - Final 阶段：汇总输出
 - Plan 失败修复：当计划 JSON 不合规时，自动触发一次修复重试
 - 审计落盘：每次运行保存完整 JSON 审计日志
-- 通过调用 `gopi --print` 复用现有模型与工具能力
+- 优先通过 `go-pi` SDK 直接调用能力（初始化失败时回退到 `gopi --print`）
 
 ## 运行
 
@@ -54,17 +54,19 @@ make test
 
 - `--gopi-bin`：gopi 可执行文件路径
 - `--cwd`：任务工作目录
-- `--timeout`：每次 LLM 调用超时秒数（默认 120）
+- `--timeout`：每次 LLM 调用超时秒数（默认 300，超时会自动重试 1 次）
 - `--auto-approve`：自动批准高风险步骤
 - `--max-retries`：每个 act 步骤最大重试次数
 - `--audit-dir`：审计日志目录（默认 `.gopi-pro/runs`）
 - `--show-audit`：显示最新审计摘要并退出
 - `--show-audit-full`：显示指定审计完整 JSON 并退出
 - `--show-audit-index`：指定查看第 N 新审计（默认 `1`）
+- `--no-spinner`：禁用“思考中”加载动画
 
 ## 常见提示
 
 - 若提示 `(no audit directory)` 或 `(no audit files)`，先执行一次正常任务生成审计文件。
+- 若出现 `context deadline exceeded`，可先用 `--no-spinner` 排除 UI 干扰，再适当调大 `--timeout` 观察是否为后端响应慢。
 
 ## 说明
 
