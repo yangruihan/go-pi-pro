@@ -21,6 +21,8 @@ type RuntimeInfo struct {
 	Mode        string
 	Provider    string
 	Model       string
+	ConfigModel string
+	SessionModel string
 	Host        string
 	APIBase     string
 	CWD         string
@@ -30,13 +32,15 @@ type RuntimeInfo struct {
 
 func New(binPath, cwd string) *Client {
 	c := &Client{BinPath: strings.TrimSpace(binPath), Cwd: strings.TrimSpace(cwd)}
-	if sdkClient, err := gosdk.New(gosdk.Options{CWD: c.Cwd, ContinueLatest: true}); err == nil {
+	if sdkClient, err := gosdk.New(gosdk.Options{CWD: c.Cwd, ContinueLatest: true, PreferConfigModel: true}); err == nil {
 		c.sdk = sdkClient
 		si := sdkClient.Info()
 		c.info = RuntimeInfo{
 			Mode:        si.Mode,
 			Provider:    si.Provider,
 			Model:       si.Model,
+			ConfigModel: si.ConfigModel,
+			SessionModel: si.SessionModel,
 			Host:        si.Host,
 			APIBase:     si.APIBase,
 			CWD:         si.CWD,
@@ -49,6 +53,8 @@ func New(binPath, cwd string) *Client {
 			CWD:       c.Cwd,
 			Provider:  "(由 gopi 二进制决定)",
 			Model:     "(由 gopi 二进制决定)",
+			ConfigModel: "(由 gopi 二进制决定)",
+			SessionModel: "(由 gopi 二进制决定)",
 			Host:      "(由 gopi 二进制决定)",
 			APIBase:   "(由 gopi 二进制决定)",
 			SessionID: "(由 gopi 二进制决定)",

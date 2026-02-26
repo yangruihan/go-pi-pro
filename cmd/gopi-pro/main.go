@@ -304,6 +304,12 @@ func printRuntimeInfo(info gopi.RuntimeInfo) {
 	fmt.Printf("mode: %s\n", strings.TrimSpace(info.Mode))
 	fmt.Printf("provider: %s\n", strings.TrimSpace(info.Provider))
 	fmt.Printf("model: %s\n", strings.TrimSpace(info.Model))
+	if strings.TrimSpace(info.ConfigModel) != "" {
+		fmt.Printf("configured_model: %s\n", strings.TrimSpace(info.ConfigModel))
+	}
+	if strings.TrimSpace(info.SessionModel) != "" {
+		fmt.Printf("session_model: %s\n", strings.TrimSpace(info.SessionModel))
+	}
 	fmt.Printf("host: %s\n", strings.TrimSpace(info.Host))
 	fmt.Printf("api_base: %s\n", strings.TrimSpace(info.APIBase))
 	fmt.Printf("session_id: %s\n", strings.TrimSpace(info.SessionID))
