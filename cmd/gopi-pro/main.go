@@ -55,6 +55,20 @@ func main() {
 			MaxActRetries: *maxRetries,
 			AuditDir:      *auditDir,
 			WorkingDir:    cwd,
+			OnProgress: func(ev agent.ProgressEvent) {
+				phase := strings.ToUpper(strings.TrimSpace(ev.Phase))
+				if phase == "" {
+					phase = "PROGRESS"
+				}
+				if ev.Total > 0 {
+					fmt.Printf("\n[%s] %s (%d/%d)\n", phase, strings.TrimSpace(ev.Message), ev.Completed, ev.Total)
+				} else {
+					fmt.Printf("\n[%s] %s\n", phase, strings.TrimSpace(ev.Message))
+				}
+				if strings.TrimSpace(ev.TodoText) != "" && ev.TodoText != "(no todos)" {
+					fmt.Println(ev.TodoText)
+				}
+			},
 			Approver: func(_ context.Context, step agent.PlanStep) (bool, error) {
 				if *autoApprove {
 					return true, nil
@@ -329,6 +343,10 @@ type timeoutLLM struct {
 	timeout time.Duration
 }
 
+type askWithStatsInner interface {
+	AskWithStats(ctx context.Context, prompt string) (text string, toolCalls int, writeToolCalls int, err error)
+}
+
 func (t timeoutLLM) Ask(parentCtx context.Context, prompt string) (string, error) {
 	out, err := t.askWithStreamingRetry(parentCtx, prompt, t.timeout)
 	if err == nil {
@@ -343,6 +361,22 @@ func (t timeoutLLM) Ask(parentCtx context.Context, prompt string) (string, error
 		retryTimeout = 60 * time.Second
 	}
 	return t.askWithStreamingRetry(parentCtx, prompt, retryTimeout)
+}
+
+func (t timeoutLLM) AskWithStats(parentCtx context.Context, prompt string) (string, int, int, error) {
+	out, toolCalls, writeToolCalls, err := t.askWithStatsRetry(parentCtx, prompt, t.timeout)
+	if err == nil {
+		return out, toolCalls, writeToolCalls, nil
+	}
+	if !isTimeoutErr(err) {
+		return "", 0, 0, err
+	}
+
+	retryTimeout := t.timeout * 2
+	if retryTimeout < 60*time.Second {
+		retryTimeout = 60 * time.Second
+	}
+	return t.askWithStatsRetry(parentCtx, prompt, retryTimeout)
 }
 
 func (t timeoutLLM) askWithStreamingRetry(parentCtx context.Context, prompt string, timeout time.Duration) (string, error) {
@@ -369,6 +403,38 @@ func (t timeoutLLM) askWithStreamingRetry(parentCtx context.Context, prompt stri
 		}
 	}
 	return "", lastErr
+}
+
+func (t timeoutLLM) askWithStatsRetry(parentCtx context.Context, prompt string, timeout time.Duration) (string, int, int, error) {
+	if timeout <= 0 {
+		timeout = 120 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(parentCtx, timeout)
+	defer cancel()
+
+	inner, ok := t.inner.(askWithStatsInner)
+	if !ok {
+		out, err := t.inner.Ask(ctx, prompt)
+		return out, -1, -1, err
+	}
+
+	var lastErr error
+	for i := 0; i < 8; i++ {
+		out, toolCalls, writeToolCalls, err := inner.AskWithStats(ctx, prompt)
+		if err == nil {
+			return out, toolCalls, writeToolCalls, nil
+		}
+		lastErr = err
+		if !isAlreadyStreamingErr(err) {
+			return "", 0, 0, err
+		}
+		select {
+		case <-ctx.Done():
+			return "", 0, 0, ctx.Err()
+		case <-time.After(300 * time.Millisecond):
+		}
+	}
+	return "", 0, 0, lastErr
 }
 
 func isTimeoutErr(err error) bool {

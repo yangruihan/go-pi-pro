@@ -89,6 +89,22 @@ func (c *Client) Ask(ctx context.Context, prompt string) (string, error) {
 	return strings.TrimSpace(out.String()), nil
 }
 
+func (c *Client) AskWithStats(ctx context.Context, prompt string) (string, int, int, error) {
+	if c.sdk != nil {
+		text, meta, err := c.sdk.AskWithMeta(ctx, prompt)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		return text, meta.ToolCallCount(), meta.WriteToolCallCount(), nil
+	}
+
+	text, err := c.Ask(ctx, prompt)
+	if err != nil {
+		return "", 0, 0, err
+	}
+	return text, 0, 0, nil
+}
+
 func (c *Client) Close() error {
 	if c.sdk != nil {
 		return c.sdk.Close()
