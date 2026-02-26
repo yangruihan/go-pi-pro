@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -21,7 +22,7 @@ func main() {
 	var (
 		gopiBin       = flag.String("gopi-bin", "../gopi/build/gopi.exe", "path to gopi binary")
 		workdir       = flag.String("cwd", "", "working directory for task")
-		timeout       = flag.Int("timeout", 120, "timeout seconds for each LLM call")
+		timeout       = flag.Int("timeout", 300, "timeout seconds for each LLM call")
 		autoApprove   = flag.Bool("auto-approve", false, "auto approve high-risk steps")
 		maxRetries    = flag.Int("max-retries", 2, "max retries for each action step")
 		auditDir      = flag.String("audit-dir", ".gopi-pro/runs", "directory to persist run audit json")
@@ -298,8 +299,33 @@ type timeoutLLM struct {
 	timeout time.Duration
 }
 
-func (t timeoutLLM) Ask(_ context.Context, prompt string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), t.timeout)
+func (t timeoutLLM) Ask(parentCtx context.Context, prompt string) (string, error) {
+	ctx, cancel := context.WithTimeout(parentCtx, t.timeout)
 	defer cancel()
-	return t.inner.Ask(ctx, prompt)
+	out, err := t.inner.Ask(ctx, prompt)
+	if err == nil {
+		return out, nil
+	}
+	if !isTimeoutErr(err) {
+		return "", err
+	}
+
+	retryTimeout := t.timeout * 2
+	if retryTimeout < 60*time.Second {
+		retryTimeout = 60 * time.Second
+	}
+	ctx2, cancel2 := context.WithTimeout(parentCtx, retryTimeout)
+	defer cancel2()
+	return t.inner.Ask(ctx2, prompt)
+}
+
+func isTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(msg, "deadline exceeded") || strings.Contains(msg, "timeout")
 }
