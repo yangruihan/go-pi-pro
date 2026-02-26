@@ -29,6 +29,7 @@ func main() {
 		showAudit     = flag.Bool("show-audit", false, "show latest audit summary and exit")
 		showAuditFull = flag.Bool("show-audit-full", false, "show selected audit raw json and exit")
 		auditIndex    = flag.Int("show-audit-index", 1, "which latest audit to show, 1 means most recent")
+		noSpinner     = flag.Bool("no-spinner", false, "disable thinking spinner output")
 	)
 	flag.Parse()
 
@@ -81,9 +82,14 @@ func main() {
 			continue
 		}
 
-		indicator := newThinkingIndicator()
+		var indicator *thinkingIndicator
+		if !*noSpinner {
+			indicator = newThinkingIndicator()
+		}
 		res, err := runner.Run(context.Background(), text)
-		indicator.StopAndClear()
+		if indicator != nil {
+			indicator.StopAndClear()
+		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			continue
